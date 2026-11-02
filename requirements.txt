@@ -1,0 +1,5 @@
+# Analysis dependencies (OpenCV comes from apt: python3-opencv; the venv uses system site-packages).
+# numpy < 2: the apt OpenCV is built against numpy 1.x.
+numpy>=1.17,<2
+pandas>=1.1
+matplotlib>=3.1

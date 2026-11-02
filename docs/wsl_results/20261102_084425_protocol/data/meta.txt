@@ -1,0 +1,8 @@
+duration_s=600.018
+imu_samples=82335
+fisheye_frames=5223
+pose_samples=0
+save_images=1
+save_every=1
+images_not_written=0
+slam=0
