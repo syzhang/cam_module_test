@@ -25,6 +25,7 @@ unzip <vendor SDK package>.zip -d ../vendor_sdk    # or set SDK_DIR in sdk.conf
 scripts/check_camera.sh       # USB 3 link + 4 s stream probe
 scripts/run_full_test.sh      # everything (~25 min, the 10-min part is interactive)
                               # or add --short: check + 3-min guided test + analysis (~5 min)
+                              # or add --quick: check + 5-min guided test with SLAM + analysis (~10 min)
 ```
 
 `setup.sh` finds the SDK's `.deb` and udev rule anywhere inside that folder. `./setup.sh --sdk /path/to/sdk` overrides
@@ -51,11 +52,12 @@ The combined report is written to `data/<stamp>_fulltest/REPORT.md`.
 | 6. analysis | delivery, image metrics (slow part), IMU and image–IMU analysis | 5–15 min |
 
 Between steps the script re-checks the camera. If it has dropped off USB, the script asks you to re-plug it.
-Options: `--short`, `--no-demos`, `--no-sessions`, `--show` (live preview during the guided test).
+Options: `--quick`, `--short`, `--no-demos`, `--no-sessions`, `--show` (live preview during the guided test).
 
 `--short` runs only steps 1, 5 and 6, with a 3-minute guided test that puts fast motion last, so a loose cable costs the
 least. Without the stream test the report has no firmware version, and with 15–25 s rests its IMU noise figures are rougher.
-In either mode, the guided test stops and says so if the IMU data stops arriving for 6 s.
+`--quick` also runs only steps 1, 5 and 6: 5 minutes with SLAM on throughout, including a slide along the long edge of a
+14-inch MacBook Pro (about 31.3 cm) and back, to check SLAM's distance. In every mode, the guided test stops and says so if the IMU data stops arriving for 6 s.
 
 ## Individual tools
 
@@ -66,7 +68,7 @@ In either mode, the guided test stops and says so if the IMU data stops arriving
 | `scripts/vendor_demos.sh [out]` | vendor demos under gdb → `vendor_demos.md` |
 | `scripts/record.sh <name> <s> [--no-images] [--slam] [--show] [--save-every N]` | one recording |
 | `scripts/record_sessions.sh [s]` | streams / +images / +SLAM comparison |
-| `scripts/record_protocol.sh [name] [--short \| --slam] [--show]` | guided 10-minute test, 3-minute test, or 75-second SLAM check (needs a tape measure) |
+| `scripts/record_protocol.sh [name] [--quick \| --short \| --slam] [--show]` | guided 10-minute test, 5-minute test with SLAM, 3-minute test, or 75-second SLAM check |
 | `scripts/analyze_session.sh <session>` | all analyses for one recording |
 | `analysis/module_quality.py <still> <motion>` | quality report from a separate still + motion recording |
 | `scripts/export_frame.sh <session> <frame> <out.png>` | all 4 cameras of one frame as a PNG |

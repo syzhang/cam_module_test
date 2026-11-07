@@ -1,9 +1,10 @@
 #!/bin/bash
 # Guided image/IMU test: prints what to do and when (with a beep), records IMU + all fisheye
 # images, and saves the cue schedule (phases.csv) next to the data.
-# Usage: scripts/record_protocol.sh [name] [--short | --slam] [--show]
+# Usage: scripts/record_protocol.sh [name] [--quick | --short | --slam] [--show]
+#   --quick  5-minute version with SLAM on throughout and a known-distance step along a 14-inch MacBook Pro
 #   --short  3-minute version: gentle steps first and fast motion last, so a cable drop costs the least
-#   --slam   75-second SLAM check with a 1 m tape measure: records poses and every 5th image
+#   --slam   75-second SLAM check over a measured distance: records poses and every 5th image
 #   --show   live preview window
 #   -> $DATA_DIR/<name>/   then run: scripts/analyze_session.sh $DATA_DIR/<name>
 # The analysis finds the rest periods from the data, so starting each step a bit late is fine.
@@ -15,16 +16,18 @@ SHOW=
 NAME=
 SHORT=0
 SLAM=0
+QUICK=0
 for arg in "$@"; do
     case $arg in
         --show) SHOW=--show ;;
         --no-show) SHOW= ;;
         --short) SHORT=1 ;;
         --slam) SLAM=1 ;;
+        --quick) QUICK=1 ;;
         *) NAME=$arg ;;
     esac
 done
-if [ "$SHORT" = 1 ] && [ "$SLAM" = 1 ]; then echo "Use either --short or --slam, not both."; exit 1; fi
+if [ $(( SHORT + SLAM + QUICK )) -gt 1 ]; then echo "Use only one of --quick, --short and --slam."; exit 1; fi
 NAME=${NAME:-$(date +%Y%m%d_%H%M%S)_protocol}
 OUT="$DATA_DIR/$NAME"
 
@@ -63,13 +66,30 @@ fi
 REC_ARGS=
 if [ "$SLAM" = 1 ]; then
     PHASES="0,10,still_start,Leave the camera on the table and do not touch it
-10,20,tape_1m,Pick it up: move it SLOWLY along the tape for exactly 1 m
-20,30,still_1m,PUT IT DOWN at the 1 m mark - do not touch
+10,20,measured_move,Pick it up: move it SLOWLY along your measured distance
+20,30,still_measured,PUT IT DOWN at the far end - do not touch
 30,60,walk,Pick it up: walk a slow loop and keep detailed surfaces in view
 60,65,return,Go back to the exact starting spot
 65,75,still_end,PUT IT DOWN on the starting spot - do not touch"
     TITLE="75-second SLAM"; NEED_GB=1; NEED_NOTE="this test needs ~1 GB"
     REC_ARGS="--slam --save-every 5"
+fi
+if [ "$QUICK" = 1 ]; then
+    PHASES="0,30,still_start,Leave the camera at the first MacBook corner and do not touch it
+30,40,ruler_out,SLOWLY slide it along the long edge to the far corner without rotating
+40,55,still_ruler_far,STOP at the far corner - do not touch
+55,65,ruler_back,SLOWLY slide it back to the first corner without rotating
+65,80,still_ruler_start,STOP at the first corner - do not touch
+80,100,slow_rotate,Pick it up: SLOWLY tilt / turn / roll
+100,115,still_1,Put it down on the table - do not touch
+115,145,translate,Move forward/back / left/right / up/down WITHOUT rotating
+145,160,still_2,Put it down - do not touch
+160,220,walk,Walk around holding it like a UMI gripper (normal use)
+220,235,still_3,Put it down - do not touch
+235,255,fast_rotate,Pick it up: rotate FAST (last motion step)
+255,285,still_end,Put it back at the first MacBook corner and do not touch it"
+    TITLE="5-minute"; NEED_GB=13; NEED_NOTE="5 min at 30 fps needs ~11 GB"
+    REC_ARGS="--slam"
 fi
 DURATION=$(echo "$PHASES" | tail -1 | cut -d, -f2)
 STALL_S=6   # the recorder reports its counts every 2 s
@@ -92,7 +112,8 @@ echo "=================================================================="
 echo " $TITLE guided test -> $OUT"
 echo " Follow the instructions as they appear."
 echo " Hold the cable together with the camera so the plug isn't tugged."
-[ "$SLAM" = 1 ] && echo " You need a tape measure laid out on the table, with the starting spot and the 1 m mark marked."
+[ "$SLAM" = 1 ] && echo " Mark out a measured distance on a table first."
+[ "$QUICK" = 1 ] && echo " Close a 14-inch MacBook Pro flat on a hard table. Its long edge (about 31.3 cm) is your ruler." && echo " Start with the camera touching that edge at one corner, and keep the same point against the edge when sliding."
 if [ -n "$SHOW" ]; then echo " Preview window: press q in it to stop early."; else echo " Press Ctrl+C here to stop early (data so far is kept)."; fi
 echo "=================================================================="
 echo "$PHASES" | awk -F, '{printf "  %3d-%3ds  %s\n", $1, $2, $4}'

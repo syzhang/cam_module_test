@@ -6,7 +6,8 @@
 #   4. comparison sessions 30 s streams-only / +images / +SDK SLAM          (skip: --no-sessions)
 #   5. guided 10-min test  rests, rotations, translations, walking (interactive, follow the cues)
 #   6. analysis            delivery, image quality, IMU quality, image-IMU time alignment
-# Usage: scripts/run_full_test.sh [--short] [--no-demos] [--no-sessions] [--show]
+# Usage: scripts/run_full_test.sh [--quick | --short] [--no-demos] [--no-sessions] [--show]
+#   --quick  about 10 min in all: the camera check, a 5-minute guided test with SLAM, and the analysis
 #   --short  about 5 min in all: only the camera check, a 3-minute guided test and the analysis
 # Output: $DATA_DIR/<stamp>_fulltest/REPORT.md  (+ all raw data and per-step reports)
 . "$(dirname "$0")/common.sh"
@@ -18,6 +19,7 @@ for a in "$@"; do
         --no-sessions) SESSIONS=0 ;;
         --show) SHOW=--show ;;
         --short) SHORT=--short; DEMOS=0; SESSIONS=0; STREAMS=0; GUIDED=3-minute ;;
+        --quick) SHORT=--quick; DEMOS=0; SESSIONS=0; STREAMS=0; GUIDED=5-minute ;;
         *) echo "unknown option $a"; exit 1 ;;
     esac
 done
