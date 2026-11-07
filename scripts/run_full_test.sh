@@ -6,16 +6,18 @@
 #   4. comparison sessions 30 s streams-only / +images / +SDK SLAM          (skip: --no-sessions)
 #   5. guided 10-min test  rests, rotations, translations, walking (interactive, follow the cues)
 #   6. analysis            delivery, image quality, IMU quality, image-IMU time alignment
-# Usage: scripts/run_full_test.sh [--no-demos] [--no-sessions] [--show]
+# Usage: scripts/run_full_test.sh [--short] [--no-demos] [--no-sessions] [--show]
+#   --short  about 5 min in all: only the camera check, a 3-minute guided test and the analysis
 # Output: $DATA_DIR/<stamp>_fulltest/REPORT.md  (+ all raw data and per-step reports)
 . "$(dirname "$0")/common.sh"
 need_recorder
-DEMOS=1; SESSIONS=1; SHOW=
+DEMOS=1; SESSIONS=1; STREAMS=1; SHOW=; SHORT=; GUIDED=10-minute
 for a in "$@"; do
     case $a in
         --no-demos) DEMOS=0 ;;
         --no-sessions) SESSIONS=0 ;;
         --show) SHOW=--show ;;
+        --short) SHORT=--short; DEMOS=0; SESSIONS=0; STREAMS=0; GUIDED=3-minute ;;
         *) echo "unknown option $a"; exit 1 ;;
     esac
 done
@@ -39,9 +41,11 @@ ready() {
 echo; echo "===== 1. camera check ====="
 ready || { echo "No camera, stopping."; exit 1; }
 
-echo; echo "===== 2. stream test ====="
-bash "$S/test_streams.sh" "$RUN/streams" imu stereo rgb tof
-ready || true
+if [ "$STREAMS" = 1 ]; then
+    echo; echo "===== 2. stream test ====="
+    bash "$S/test_streams.sh" "$RUN/streams" imu stereo rgb tof
+    ready || true
+fi
 
 if [ "$DEMOS" = 1 ]; then
     echo; echo "===== 3. vendor demos ====="
@@ -61,9 +65,9 @@ if [ "$SESSIONS" = 1 ]; then
     done
 fi
 
-echo; echo "===== 5. guided 10-minute test ====="
+echo; echo "===== 5. guided $GUIDED test ====="
 ready || true
-bash "$S/record_protocol.sh" "$(basename "$RUN")/protocol" $SHOW
+bash "$S/record_protocol.sh" "$(basename "$RUN")/protocol" $SHOW $SHORT
 
 echo; echo "===== 6. analysis ====="
 for d in "$RUN"/session_*; do
@@ -79,10 +83,16 @@ R="$RUN/REPORT.md"
     echo "## Test machine"
     echo
     bash "$S/sysinfo.sh" "$RUN/streams"
-    echo
-    echo "## 1–2. Streams (each started on its own)"
-    echo
-    sed '1,2d' "$RUN/streams/streams.md" 2>/dev/null
+    if [ -f "$RUN/streams/streams.md" ]; then
+        echo
+        echo "## 1–2. Streams (each started on its own)"
+        echo
+        sed '1,2d' "$RUN/streams/streams.md"
+    fi
+    if [ -f "$RUN/protocol/stream_stopped.txt" ]; then
+        echo
+        echo "**Data stopped arriving $(cut -d= -f2 "$RUN/protocol/stream_stopped.txt") s into the guided test, so the recording was stopped there** (cable or module drop-out). Later steps are missing."
+    fi
     if [ -f "$RUN/vendor_demos/vendor_demos.md" ]; then
         echo
         echo "## 3. Vendor demos"

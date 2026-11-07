@@ -102,12 +102,13 @@ def main():
     if img is not None:
         img["t"] = (img["edge_us"] - e0) / 1e6
     end_t = imu["t"].iloc[-1]
+    planned_end = phases.end_s.max()
     phases = phases[phases.start_s < end_t]
 
     L = ["# Protocol test: %s" % os.path.basename(os.path.normpath(s)), "",
          "Recorded %.0f s of IMU (%d samples) and %d fisheye frames. Phases trimmed by %.0f s at each edge."
          % (end_t, len(imu), len(fe), TRIM), ""]
-    if end_t < phases.end_s.max() - 5:
+    if end_t < planned_end - 5:
         L += ["**Recording ended early at %.0f s** (device stopped or test aborted)." % end_t, ""]
 
     # --- Delivery per phase --------------------------------------------------------------
