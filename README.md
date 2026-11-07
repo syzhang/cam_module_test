@@ -66,7 +66,7 @@ In either mode, the guided test stops and says so if the IMU data stops arriving
 | `scripts/vendor_demos.sh [out]` | vendor demos under gdb → `vendor_demos.md` |
 | `scripts/record.sh <name> <s> [--no-images] [--slam] [--show] [--save-every N]` | one recording |
 | `scripts/record_sessions.sh [s]` | streams / +images / +SLAM comparison |
-| `scripts/record_protocol.sh [name] [--short] [--show]` | guided 10-minute (or 3-minute) test |
+| `scripts/record_protocol.sh [name] [--short \| --slam] [--show]` | guided 10-minute test, 3-minute test, or 75-second SLAM check (needs a tape measure) |
 | `scripts/analyze_session.sh <session>` | all analyses for one recording |
 | `analysis/module_quality.py <still> <motion>` | quality report from a separate still + motion recording |
 | `scripts/export_frame.sh <session> <frame> <out.png>` | all 4 cameras of one frame as a PNG |

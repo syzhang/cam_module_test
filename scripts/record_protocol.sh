@@ -1,8 +1,9 @@
 #!/bin/bash
 # Guided image/IMU test: prints what to do and when (with a beep), records IMU + all fisheye
 # images, and saves the cue schedule (phases.csv) next to the data.
-# Usage: scripts/record_protocol.sh [name] [--short] [--show]
+# Usage: scripts/record_protocol.sh [name] [--short | --slam] [--show]
 #   --short  3-minute version: gentle steps first and fast motion last, so a cable drop costs the least
+#   --slam   75-second SLAM check with a 1 m tape measure: records poses and every 5th image
 #   --show   live preview window
 #   -> $DATA_DIR/<name>/   then run: scripts/analyze_session.sh $DATA_DIR/<name>
 # The analysis finds the rest periods from the data, so starting each step a bit late is fine.
@@ -13,14 +14,17 @@ need_recorder
 SHOW=
 NAME=
 SHORT=0
+SLAM=0
 for arg in "$@"; do
     case $arg in
         --show) SHOW=--show ;;
         --no-show) SHOW= ;;
         --short) SHORT=1 ;;
+        --slam) SLAM=1 ;;
         *) NAME=$arg ;;
     esac
 done
+if [ "$SHORT" = 1 ] && [ "$SLAM" = 1 ]; then echo "Use either --short or --slam, not both."; exit 1; fi
 NAME=${NAME:-$(date +%Y%m%d_%H%M%S)_protocol}
 OUT="$DATA_DIR/$NAME"
 
@@ -56,6 +60,17 @@ if [ "$SHORT" = 1 ]; then
 165,180,still_end,Put it down in the same spot and do not touch it"
     TITLE="3-minute"; NEED_GB=8; NEED_NOTE="3 min at 30 fps needs ~7 GB"
 fi
+REC_ARGS=
+if [ "$SLAM" = 1 ]; then
+    PHASES="0,10,still_start,Leave the camera on the table and do not touch it
+10,20,tape_1m,Pick it up: move it SLOWLY along the tape for exactly 1 m
+20,30,still_1m,PUT IT DOWN at the 1 m mark - do not touch
+30,60,walk,Pick it up: walk a slow loop and keep detailed surfaces in view
+60,65,return,Go back to the exact starting spot
+65,75,still_end,PUT IT DOWN on the starting spot - do not touch"
+    TITLE="75-second SLAM"; NEED_GB=1; NEED_NOTE="this test needs ~1 GB"
+    REC_ARGS="--slam --save-every 5"
+fi
 DURATION=$(echo "$PHASES" | tail -1 | cut -d, -f2)
 STALL_S=6   # the recorder reports its counts every 2 s
 
@@ -77,6 +92,7 @@ echo "=================================================================="
 echo " $TITLE guided test -> $OUT"
 echo " Follow the instructions as they appear."
 echo " Hold the cable together with the camera so the plug isn't tugged."
+[ "$SLAM" = 1 ] && echo " You need a tape measure laid out on the table, with the starting spot and the 1 m mark marked."
 if [ -n "$SHOW" ]; then echo " Preview window: press q in it to stop early."; else echo " Press Ctrl+C here to stop early (data so far is kept)."; fi
 echo "=================================================================="
 echo "$PHASES" | awk -F, '{printf "  %3d-%3ds  %s\n", $1, $2, $4}'
@@ -89,7 +105,7 @@ echo "$PHASES" >> "$OUT/phases.csv"
 
 # Ctrl+C reaches the recorder too (it stops and flushes); keep this script alive to finish up.
 trap 'echo; echo "Stopping early..."' INT
-"$REC" "$OUT" "$DURATION" $SHOW > "$OUT/recorder.log" 2>&1 &
+"$REC" "$OUT" "$DURATION" $REC_ARGS $SHOW > "$OUT/recorder.log" 2>&1 &
 REC_PID=$!
 # Wait until the recorder actually starts recording, so cues line up with the data.
 until grep -q "Recording to" "$OUT/recorder.log" 2>/dev/null; do
@@ -132,9 +148,18 @@ stop_stalled() {
 }
 
 while IFS=, read -r start end phase text; do
+    WARNED=0
     while [ $(( $(date +%s) - T0 )) -lt "$start" ]; do
         kill -0 $REC_PID 2>/dev/null || break 2
         stream_alive || { stop_stalled; break 2; }
+        # Early warning before each rest, so the camera is down and still when the rest starts.
+        case $phase in still*)
+            if [ "$WARNED" = 0 ] && [ $(( start - ($(date +%s) - T0) )) -le 5 ]; then
+                WARNED=1
+                printf '\a'
+                echo "        ... get ready, PUT IT DOWN in 5 s"
+            fi ;;
+        esac
         sleep 0.2
     done
     kill -0 $REC_PID 2>/dev/null || break
